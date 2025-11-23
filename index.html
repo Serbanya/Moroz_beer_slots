@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Moroz beer slots</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --primary-color: #ffd700;
+            --secondary-color: #1a1a2e;
+            --accent-color: #e94560;
+            --text-color: #ffffff;
+            --reel-bg: #f0f0f0;
+            --reel-border: #333;
+            --win-color: #4caf50;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--secondary-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        .game-container {
+            width: 100%;
+            max-width: 600px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        h1 {
+            margin: 0;
+            color: var(--primary-color);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+        }
+
+        .slot-machine {
+            background: linear-gradient(45deg, #2c3e50, #000000);
+            padding: 15px;
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            border: 2px solid var(--primary-color);
+            width: 100%;
+        }
+
+        .reels-container {
+            display: flex;
+            gap: 5px;
+            background-color: #000;
+            padding: 5px;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Payline indicators (simplified visual) */
+        .payline-indicator {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: rgba(255, 215, 0, 0.3);
+            pointer-events: none;
+            display: none;
+            /* Hidden by default */
+            z-index: 10;
+        }
+
+        .reel {
+            flex: 1;
+            background-color: var(--reel-bg);
+            height: 240px;
+            /* 3 symbols * 80px */
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .reel-strip {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            transition: transform 0.1s linear;
+            /* Dynamic transition */
+        }
+
+        .symbol {
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .symbol img {
+            width: 60px;
+            height: 60px;
+            object-fit: contain;
+        }
+
+        /* Blur effect for spinning */
+        .reel.spinning .reel-strip {
+            filter: blur(2px);
+        }
+
+        .controls-area {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .info-panel {
+            display: flex;
+            justify-content: space-between;
+            font-size: 1.1em;
+            font-weight: bold;
+        }
+
+        .info-box {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 8px 15px;
+            border-radius: 5px;
+            border: 1px solid var(--primary-color);
+            min-width: 100px;
+            text-align: center;
+        }
+
+        .label {
+            font-size: 0.7em;
+            color: #aaa;
+            display: block;
+            margin-bottom: 2px;
+        }
+
+        .value {
+            color: var(--primary-color);
+        }
+
+        .action-panel {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .bet-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 5px;
+            border-radius: 25px;
+        }
+
+        .btn-circle {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: none;
+            background: var(--primary-color);
+            color: #000;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-circle:active {
+            transform: scale(0.95);
+        }
+
+        .btn-spin {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(to bottom, #e94560, #c0392b);
+            color: white;
+            font-size: 1.2em;
+            font-weight: bold;
+            text-transform: uppercase;
+            cursor: pointer;
+            box-shadow: 0 4px 0 #96281b;
+            transition: transform 0.1s;
+        }
+
+        .btn-spin:active:not(:disabled) {
+            transform: translateY(4px);
+            box-shadow: 0 0 0 #96281b;
+        }
+
+        .btn-spin:disabled {
+            background: #555;
+            box-shadow: none;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        .message-log {
+            height: 30px;
+            text-align: center;
+            color: var(--primary-color);
+            font-weight: bold;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+        }
+
+        /* Config Panel (Hidden by default, toggleable) */
+        .config-toggle {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            opacity: 0.3;
+            cursor: pointer;
+        }
+
+        /* Modal for settings */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--secondary-color);
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid var(--primary-color);
+            max-width: 80%;
+        }
+
+        .modal-content h2 {
+            margin-top: 0;
+        }
+
+        .modal-content label {
+            display: block;
+            margin: 10px 0;
+        }
+
+        .close-modal {
+            margin-top: 10px;
+            width: 100%;
+            padding: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="config-toggle" onclick="toggleConfig()">⚙️</div>
+
+    <div class="game-container">
+        <div class="header">
+            <h1>Moroz beer slots</h1>
+        </div>
+
+        <div class="slot-machine">
+            <div class="reels-container" id="reelsContainer">
+                <!-- Reels will be injected here -->
+            </div>
+        </div>
+
+        <div class="message-log" id="messageLog">Welcome! Press SPIN to play.</div>
+
+        <div class="controls-area">
+            <div class="info-panel">
+                <div class="info-box">
+                    <span class="label">BALANCE</span>
+                    <span class="value" id="balanceDisplay">1000</span>
+                </div>
+                <div class="info-box">
+                    <span class="label">WIN</span>
+                    <span class="value" id="winDisplay">0</span>
+                </div>
+            </div>
+
+            <div class="action-panel">
+                <div class="bet-controls">
+                    <button class="btn-circle" onclick="adjustBet(-10)">-</button>
+                    <span style="min-width: 40px; text-align: center;" id="betDisplay">10</span>
+                    <button class="btn-circle" onclick="adjustBet(10)">+</button>
+                </div>
+                <button class="btn-spin" id="spinBtn" onclick="spin()">SPIN</button>
+            </div>
+        </div>
+    </div>
+    </div>
+
+    <script>
+        // --- Configuration ---
+        const CONFIG = {
+            reelCount: 5,
+            rowCount: 3,
+            symbolHeight: 80, // px
+            spinDuration: 2000, // ms base duration
+            reelDelay: 200, // ms delay between reels stopping
+            symbols: [
+                { id: 'wild', val: 10, text: '💎', img: 'img/berry.webp' },
+                { id: 'seven', val: 8, text: '7️⃣', img: 'img/blue.webp' },
+                { id: 'bell', val: 6, text: '🔔', img: 'img/orange.webp' },
+                { id: 'bar', val: 5, text: '➖', img: 'img/bottle_orange.webp' },
+                { id: 'cherry', val: 4, text: '🍒', img: 'img/bottle_blue.webp' },
+                { id: 'lemon', val: 3, text: '🍋', img: 'img/tiffany.webp' },
+                { id: 'grape', val: 2, text: '🍇', img: 'img/vibe.webp' },
+                { id: 'orange', val: 1, text: '🍊', img: 'img/zero.webp' }
+            ],
+            // Simple paylines (rows)
+            paylines: [
+                [0, 0, 0, 0, 0], // Top row
+                [1, 1, 1, 1, 1], // Middle row
+                [2, 2, 2, 2, 2], // Bottom row
+                [0, 1, 2, 1, 0], // V shape
+                [2, 1, 0, 1, 2]  // Inverted V
+            ]
+        };
+
+        // --- Game State ---
+        let state = {
+            balance: 1000,
+            bet: 10,
+            isSpinning: false,
+            useImages: true,
+            reels: [] // Will hold reel objects
+        };
+
+        // --- Audio Context (Simple Synth) ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            if (type === 'spin') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(100, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.1);
+            } else if (type === 'stop') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(200, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.1);
+            } else if (type === 'win') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+                osc.frequency.linearRampToValueAtTime(800, audioCtx.currentTime + 0.2);
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.5);
+            }
+        }
+
+        // --- Initialization ---
+        function init() {
+            createReels();
+            updateUI();
+
+            // Telegram WebApp integration
+            if (window.Telegram && window.Telegram.WebApp) {
+                window.Telegram.WebApp.ready();
+                window.Telegram.WebApp.expand();
+                // Apply theme colors from Telegram if available
+                const theme = window.Telegram.WebApp.themeParams;
+                if (theme.bg_color) {
+                    document.documentElement.style.setProperty('--secondary-color', theme.bg_color);
+                    document.documentElement.style.setProperty('--text-color', theme.text_color);
+                    document.documentElement.style.setProperty('--primary-color', theme.button_color || '#ffd700');
+                }
+            }
+        }
+
+        function createReels() {
+            const container = document.getElementById('reelsContainer');
+            container.innerHTML = '';
+            state.reels = [];
+
+            for (let i = 0; i < CONFIG.reelCount; i++) {
+                const reelDiv = document.createElement('div');
+                reelDiv.className = 'reel';
+
+                const strip = document.createElement('div');
+                strip.className = 'reel-strip';
+
+                // Initial population (random)
+                let content = '';
+                // We need enough symbols to scroll. 
+                // Let's create a strip with random symbols.
+                // We will manage the "visual" strip by just moving it and resetting.
+                // For simplicity in this "no framework" version, we'll render a long strip.
+                for (let j = 0; j < 20; j++) {
+                    content += getSymbolHtml(getRandomSymbol());
+                }
+
+                strip.innerHTML = content;
+                reelDiv.appendChild(strip);
+                container.appendChild(reelDiv);
+
+                // Store reel state
+                state.reels.push({
+                    el: strip,
+                    parent: reelDiv,
+                    position: 0,
+                    stops: [0, 1, 2] // Indices of visible symbols (relative to current view)
+                });
+            }
+        }
+
+        function getSymbolHtml(symbolObj) {
+            if (state.useImages) {
+                // Fallback to text if image fails (using onerror is tricky in string, 
+                // so we just assume images exist or user provides them. 
+                // For this demo, we'll use text if image not found logic isn't easily inline-able without clutter)
+                return `<div class="symbol" data-id="${symbolObj.id}"><img src="${symbolObj.img}" alt="${symbolObj.text}" onerror="this.style.display='none';this.parentNode.innerText='${symbolObj.text}'"></div>`;
+            } else {
+                return `<div class="symbol" data-id="${symbolObj.id}">${symbolObj.text}</div>`;
+            }
+        }
+
+        function getRandomSymbol() {
+            return CONFIG.symbols[Math.floor(Math.random() * CONFIG.symbols.length)];
+        }
+
+        // --- Core Logic ---
+
+        function adjustBet(amount) {
+            if (state.isSpinning) return;
+            let newBet = state.bet + amount;
+            if (newBet < 10) newBet = 10;
+            if (newBet > 100) newBet = 100; // Max bet cap
+            if (newBet > state.balance && state.balance > 0) newBet = state.balance; // Cap at balance
+
+            state.bet = newBet;
+            updateUI();
+        }
+
+        function toggleConfig() {
+            const modal = document.getElementById('configModal');
+            modal.classList.toggle('active');
+        }
+
+        function toggleSymbolMode() {
+            state.useImages = document.getElementById('useImagesCheckbox').checked;
+            createReels(); // Re-render reels
+        }
+
+        function updateUI() {
+            document.getElementById('balanceDisplay').innerText = state.balance;
+            document.getElementById('betDisplay').innerText = state.bet;
+            document.getElementById('spinBtn').disabled = state.isSpinning || state.balance < state.bet;
+        }
+
+        function log(msg) {
+            document.getElementById('messageLog').innerText = msg;
+        }
+
+        async function spin() {
+            if (state.isSpinning) return;
+            if (state.balance < state.bet) {
+                log("Insufficient funds!");
+                return;
+            }
+
+            // Deduct bet
+            state.balance -= state.bet;
+            state.isSpinning = true;
+            document.getElementById('winDisplay').innerText = "0";
+            updateUI();
+            log("Spinning...");
+            playSound('spin');
+
+            // Determine outcome immediately (server-side logic simulation)
+            const outcome = generateOutcome();
+
+            // Animate reels
+            const promises = state.reels.map((reel, index) => {
+                return spinReel(reel, index, outcome[index]);
+            });
+
+            await Promise.all(promises);
+
+            // Check wins
+            const winAmount = calculateWin(outcome);
+            if (winAmount > 0) {
+                state.balance += winAmount;
+                log(`WINNER! +${winAmount}`);
+                document.getElementById('winDisplay').innerText = winAmount;
+                playSound('win');
+                // Telegram haptic feedback
+                if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
+                    window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                }
+            } else {
+                log("Try again!");
+            }
+
+            state.isSpinning = false;
+            updateUI();
+        }
+
+        function generateOutcome() {
+            // Returns a 5x3 matrix of symbol objects
+            // Actually, we just need the 3 visible symbols for each reel.
+            // Let's generate 5 arrays, each with 3 symbols.
+            const outcome = [];
+            for (let i = 0; i < CONFIG.reelCount; i++) {
+                const reelSymbols = [];
+                for (let j = 0; j < CONFIG.rowCount; j++) {
+                    reelSymbols.push(getRandomSymbol());
+                }
+                outcome.push(reelSymbols);
+            }
+            return outcome;
+        }
+
+        function spinReel(reel, index, targetSymbols) {
+            return new Promise(resolve => {
+                const strip = reel.el;
+                const parent = reel.parent;
+
+                // Add blur class
+                parent.classList.add('spinning');
+
+                // We simulate spinning by moving the background or strip rapidly.
+                // CSS transition approach:
+                // 1. Append target symbols to the top (hidden) or bottom.
+                // 2. Translate Y to show them.
+
+                // Better approach for "infinite" feel without complex DOM manipulation in vanilla JS:
+                // Just translate huge amount, then reset to 0 with new content.
+
+                const extraSpins = 5 + index * 2; // Staggered stops
+                const symbolHeight = CONFIG.symbolHeight;
+                const totalDistance = (extraSpins * 10 * symbolHeight); // Arbitrary long distance
+
+                // Prepare the final strip content: 
+                // We need the target symbols to be at the "end" of the animation.
+                // Since we are translating Y negative (moving up), target should be at bottom?
+                // Actually, standard slot moves down (strip moves down).
+                // Let's say strip moves DOWN (translateY increases).
+                // So target symbols should be at the TOP (index 0,1,2) if we reset, 
+                // OR we append them at the top and move to 0.
+
+                // Let's try: Current strip is at 0.
+                // We want to end up showing targetSymbols.
+                // We construct a new strip string: [TargetSymbols] + [RandomSymbols...]
+                // We set translateY to -TotalDistance.
+                // Then we transition to 0.
+
+                let filler = '';
+                for (let k = 0; k < 20; k++) filler += getSymbolHtml(getRandomSymbol());
+
+                let targetHtml = '';
+                targetSymbols.forEach(s => targetHtml += getSymbolHtml(s));
+
+                // Layout: [Target (Visible at end)] [Filler (Visible during spin)]
+                // If we move from -BigNumber to 0, we see Filler then Target.
+                // So Target must be at top (0).
+
+                strip.innerHTML = targetHtml + filler;
+                strip.style.transition = 'none';
+                strip.style.transform = `translateY(-${totalDistance}px)`;
+
+                // Force reflow
+                strip.offsetHeight;
+
+                // Animate to 0
+                const duration = CONFIG.spinDuration + (index * CONFIG.reelDelay);
+                strip.style.transition = `transform ${duration}ms cubic-bezier(0.25, 0.1, 0.25, 1)`;
+                strip.style.transform = 'translateY(0)';
+
+                setTimeout(() => {
+                    parent.classList.remove('spinning');
+                    playSound('stop');
+                    if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
+                        window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+                    }
+                    resolve();
+                }, duration);
+            });
+        }
+
+        function calculateWin(outcome) {
+            let totalWin = 0;
+
+            // Outcome is [Reel1[Row1, Row2, Row3], Reel2... ]
+            // We need to access by [ReelIndex][RowIndex]
+
+            CONFIG.paylines.forEach(line => {
+                // line is array of row indices for each col: [0,0,0,0,0]
+                const symbols = line.map((rowIndex, colIndex) => outcome[colIndex][rowIndex]);
+
+                // Check for matches starting from left
+                if (symbols.length === 0) return;
+
+                const firstSymbol = symbols[0];
+                let matchCount = 1;
+
+                for (let i = 1; i < symbols.length; i++) {
+                    if (symbols[i].id === firstSymbol.id || symbols[i].id === 'wild' || firstSymbol.id === 'wild') {
+                        // Handle Wild logic: if first is wild, it takes next symbol's identity
+                        // Simplified: just check ID match or wild.
+                        matchCount++;
+                    } else {
+                        break;
+                    }
+                }
+
+                if (matchCount >= 3) {
+                    // Calculate payout
+                    // Base value * match multiplier
+                    // 3 matches = 1x, 4 = 2x, 5 = 5x
+                    let multiplier = 1;
+                    if (matchCount === 4) multiplier = 2;
+                    if (matchCount === 5) multiplier = 5;
+
+                    // Value of the symbol (if first is wild, find first non-wild or use wild val)
+                    let symbolVal = firstSymbol.val;
+                    // If first was wild, find real symbol
+                    if (firstSymbol.id === 'wild') {
+                        const nonWild = symbols.find(s => s.id !== 'wild');
+                        if (nonWild) symbolVal = nonWild.val;
+                    }
+
+                    totalWin += (state.bet * symbolVal * multiplier * 0.1); // 0.1 factor to keep numbers sane
+                }
+            });
+
+            return Math.floor(totalWin);
+        }
+
+        // Start
+        window.onload = init;
+
+    </script>
+</body>
+
+</html>
